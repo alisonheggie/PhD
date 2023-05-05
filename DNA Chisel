@@ -1,0 +1,90 @@
+import pandas as pd
+import numpy as np
+from dnachisel import *
+
+#Salmonella codon usage table
+
+Salmonella_codon_table = {
+    '*': {'TAA': 0.52, 'TAG': 0.11, 'TGA': 0.37},
+    'A': {'GCA': 0.19, 'GCC': 0.29, 'GCG': 0.34, 'GCT': 0.18},
+    'C': {'TGC': 0.55, 'TGT': 0.45},
+    'D': {'GAC': 0.40, 'GAT': 0.70},
+    'E': {'GAA': 0.63, 'GAG': 0.37},
+    'F': {'TTC': 0.41, 'TTT': 0.59},
+    'G': {'GGA': 0.15, 'GGC': 0.42, 'GGG': 0.16, 'GGT': 0.28},
+    'H': {'CAC': 0.43, 'CAT': 0.57},
+    'I': {'ATA': 0.13, 'ATC': 0.24, 'ATT': 0.45},
+    'K': {'AAA': 0.7, 'AAG': 0.3},
+    'L': {'CTA': 0.05, 'CTC': 0.11, 'CTG': 0.46, 'CTT': 0.13, 'TTA': 0.13, 'TTG': 0.12},
+    'M': {'ATG': 1.0},
+    'N': {'AAC': 0.54, 'AAT': 0.46},
+    'P': {'CCA': 0.17, 'CCC': 0.17, 'CCG': 0.47, 'CCT': 0.19},
+    'Q': {'CAA': 0.29, 'CAG': 0.71},
+    'R': {'AGA': 0.07, 'AGG': 0.06, 'CGA': 0.09, 'CGC': 0.15, 'CGG': 0.33, 'CGT': 0.30},
+    'S': {'AGC': 0.26, 'AGT': 0.14, 'TCA': 0.13, 'TCC': 0.18, 'TCG': 0.14, 'TCT': 0.15},
+    'T': {'ACA': 0.16, 'ACC': 0.37, 'ACG': 0.29, 'ACT': 0.18},
+    'V': {'GTA': 0.17, 'GTC': 0.25, 'GTG': 0.32, 'GTT': 0.27},
+    'W': {'TGG': 1.0},
+    'Y': {'TAC': 0.41, 'TAT': 0.49}
+    }
+
+#input heterologous gene amino acid sequence
+
+AA_sequence = "NPKTIKAAAYNQARSTLADAGSRTAAKSHPIHGKTDVPVSYGTSLLAAARDEFRQADKKLPAKDKKSDMSIAHYNAVHSAAKTMGIDTW"
+
+#codon optimise function with Salmonella codon table
+
+def codon_optimise(protein, Salmonella_codon_table):
+    sequence = reverse_translate(protein)
+
+#make unique dna sequences to avoid having repeated sections
+    specification_kmer_low_less = UniquifyAllKmers(6)
+    specification_kmer_low = UniquifyAllKmers(8)
+    specification_kmer_med = UniquifyAllKmers(24)
+    specification_kmer_med_high = UniquifyAllKmers(50)
+    specification_kmer_high = UniquifyAllKmers(80)
+    specification_kmer_high_more = UniquifyAllKmers(100)
+    
+#enzymes to avoid and repeating amino acid sequences to avoid
+    enzyme_SacI = EnzymeSitePattern("SacI")
+    enzyme_SalI = EnzymeSitePattern("SalI")
+    enzyme_EcoRV = EnzymeSitePattern("EcoRV")
+    enzyme_NheI = EnzymeSitePattern("NheI")
+    enzyme_BamHI = EnzymeSitePattern("BamHI")
+    enzyme_HindIII = EnzymeSitePattern("HindIII")
+    enzyme_XbaI = EnzymeSitePattern("XbaI")
+    patternA6 = HomopolymerPattern("A", 6)
+    patternG6 = HomopolymerPattern("G", 6)
+    patternA5 = HomopolymerPattern("A", 5)
+    patternG5 = HomopolymerPattern("G", 5)
+    
+    problem = DnaOptimizationProblem(
+        sequence=sequence,
+        constraints=[
+            AvoidPattern(enzyme_SacI),
+            AvoidPattern(enzyme_SalI),
+            AvoidPattern(enzyme_EcoRV),
+            AvoidPattern(enzyme_NheI),
+            AvoidPattern(enzyme_BamHI),
+            AvoidPattern(enzyme_HindIII),
+            AvoidPattern(enzyme_XbaI),
+            AvoidPattern(patternA6),
+            AvoidPattern(patternG6),
+            AvoidPattern(patternA5),
+            AvoidPattern(patternG5),
+            EnforceGCContent(mini=0.4, maxi=0.6), #define GC content
+            EnforceTranslation()], #keep translation the same as the input AA
+        objectives=[CodonOptimize(codon_usage_table=Salmonella_codon_table), specification_kmer_low_less , specification_kmer_low, specification_kmer_med, specification_kmer_med_high, specification_kmer_high, specification_kmer_high_more])
+    
+    problem.resolve_constraints()
+    problem.optimize()
+    
+    #print(problem.constraints_text_summary())
+    #print(problem.objectives_text_summary())
+    
+    final_sequence = problem.sequence
+    return final_sequence
+
+Talen_DNA_sequence_codon_optimised = codon_optimise(AA_sequence, Salmonella_codon_table)
+
+print(Talen_DNA_sequence_codon_optimised) 
